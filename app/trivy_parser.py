@@ -1,14 +1,11 @@
 from typing import Dict, Any
 
-
 SEVERITY_ORDER = ["UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
-
 
 def get_higher_severity(current: str, new: str) -> str:
     if SEVERITY_ORDER.index(new) > SEVERITY_ORDER.index(current):
         return new
     return current
-
 
 def parse_trivy_report(report: Dict[str, Any]) -> Dict[str, Any]:
     critical_count = 0

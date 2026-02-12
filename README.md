@@ -1,227 +1,235 @@
-# AutoReport Case Platform
 
-AutoReport Case Platform is a lightweight Vulnerability Case Management
-API designed to integrate directly with CI/CD pipelines.
+# SecureCase – CI Security Case Engine
 
-It automatically creates or updates security cases when container image
-scans (e.g., Trivy) detect vulnerabilities during builds.
+SecureCase is a backend service designed to automatically track security findings detected during CI/CD pipelines.
 
-This project demonstrates practical DevSecOps automation patterns
-including automated reporting, case tracking, and PR security gating.
+It integrates with container image scanners (e.g., Trivy) and creates or updates security cases based on vulnerability findings.  
+The system is optimized for DevSecOps workflows and supports branch-based tracking and merge gating for pull requests.
 
-------------------------------------------------------------------------
+---
 
-# 🎯 Purpose
+## 🚀 Project Purpose
 
-Modern DevSecOps teams require automated enforcement of security
-policies during software delivery.
+Modern CI pipelines build Docker images on every commit or pull request.  
+SecureCase enables:
 
-This platform enables:
+- Automatic ingestion of Trivy scan results
+- Case tracking per branch or PR
+- Merge blocking when HIGH / CRITICAL vulnerabilities are detected
+- Centralized visibility of findings across repositories
 
--   Automated vulnerability case creation from pipeline scans
--   Tracking vulnerabilities per branch or PR
--   Storing normalized findings
--   Enforcing severity thresholds
--   Blocking PR merges when policy violations occur
+This project is designed as a DevSecOps portfolio demonstration.
 
-It is designed to simulate a real-world vulnerability management
-workflow integrated into CI/CD.
+---
 
-------------------------------------------------------------------------
+## 🏗 Architecture Overview
 
-# 🏗 High-Level Architecture
+Developer Workflow:
 
-Developer → Pull Request\
-↓\
-GitHub Actions Pipeline\
-↓\
-Docker Build\
-↓\
-Trivy Image Scan\
-↓\
-POST /api/v1/ingest/trivy\
-↓\
-Case Created / Updated\
-↓\
-(Optional) PR Blocked if HIGH/CRITICAL found
+1. Developer pushes code or opens a Pull Request
+2. CI builds Docker image
+3. Trivy scans image
+4. Pipeline sends scan JSON to SecureCase API
+5. SecureCase:
+   - Creates or updates a case
+   - Calculates severity counts
+   - Decides if merge gate should block PR
+   - Stores full Trivy report as JSONB
 
-------------------------------------------------------------------------
+---
 
-# 🧱 Technology Stack
+## 📦 Tech Stack
 
--   Python 3.12
--   FastAPI
--   SQLAlchemy 2.x
--   PostgreSQL
--   Docker
--   Trivy (Container Security Scanner)
--   GitHub Actions (CI/CD)
+- Python 3.12
+- FastAPI
+- SQLAlchemy 2.x
+- PostgreSQL (JSONB storage)
+- Docker / Docker Compose
 
-------------------------------------------------------------------------
+---
 
-# 📦 Repository Structure
+## 🗂 Project Structure
 
-autoreport-case-platform/ │ ├── app/ │ ├── main.py │ ├── db.py │ ├──
-models.py │ ├── schemas.py │ └── trivy_parser.py │ ├── docker/ │ └──
-Dockerfile │ ├── docker-compose.yml ├── requirements.txt ├──
-.env.example └── README.md
+```
+app/
+ ├── main.py          # API routes
+ ├── models.py        # SQLAlchemy models
+ ├── schemas.py       # Pydantic schemas
+ ├── db.py            # Database session & engine
+ ├── settings.py      # Environment configuration
+ ├── trivy_parser.py  # Trivy JSON parser
+docker-compose.yml
+Dockerfile
+requirements.txt
+```
 
-------------------------------------------------------------------------
+---
 
-# 🚀 Getting Started (Local Development)
+## 🐳 Run with Docker
 
-## 1️⃣ Clone the repository
+Build and start:
 
-git clone https://github.com/YOUR_USERNAME/autoreport-case-platform.git\
-cd autoreport-case-platform
-
-------------------------------------------------------------------------
-
-## 2️⃣ Configure environment variables
-
-Copy the example file:
-
-cp .env.example .env
-
-Adjust values if needed.
-
-Example configuration:
-
-API_PORT=8000\
-API_KEY=dev-secret-change-me\
-API_KEY_HEADER=X-API-Key
-
-POSTGRES_USER=securecase_user\
-POSTGRES_PASSWORD=securecase_pass\
-POSTGRES_DB=securecase_db\
-POSTGRES_PORT=5433
-
-DATABASE_URL=postgresql+psycopg2://securecase_user:securecase_pass@db:5432/securecase_db
-
-PGADMIN_DEFAULT_EMAIL=system@gmail.com\
-PGADMIN_DEFAULT_PASSWORD=root\
-PGADMIN_PORT=5051
-
-------------------------------------------------------------------------
-
-## 3️⃣ Start the platform
-
-docker compose up -d --build
+```bash
+docker compose down -v
+docker compose up --build
+```
 
 Services:
 
--   API → http://localhost:8000/docs
--   pgAdmin → http://localhost:5051
+- API: http://localhost:8000
+- Swagger UI: http://localhost:8000/docs
+- pgAdmin: http://localhost:5050
 
-------------------------------------------------------------------------
+---
 
-# 🔐 Authentication
+## 🔐 Authentication
 
-All ingestion requests require an API key.
+Requests to ingestion endpoint require an API key header:
 
-Header format:
+```
+X-API-Key: your_secret_key
+```
 
-X-API-Key: `<your-secret>`{=html}
+Set it via environment variable:
 
-The value must match the API_KEY defined in your .env file.
+```
+API_KEY=your_secret_key
+```
 
-------------------------------------------------------------------------
+---
 
-# 📡 Core Endpoint
+## 📥 Ingest Endpoint
 
-## POST /api/v1/ingest/trivy
+POST `/api/v1/ingest/trivy`
 
-Receives Trivy JSON output and performs:
+This endpoint receives:
 
--   Case upsert (per branch or PR)
--   Vulnerability normalization
--   Severity calculation
--   Policy gate evaluation
--   Audit event logging
+- Metadata (repo, branch, PR info, commit SHA, pipeline run info)
+- Image information (name, tag, digest)
+- Full Trivy JSON report
 
-### Case Identification Logic
+### Case Key Logic
 
-If Pull Request exists: case_key = repo::PR::`<pr_id>`{=html}
+- PR build:
+```
+provider::org::repo::PR::<pr_id>
+```
 
-Otherwise: case_key = repo::BR::`<branch_name>`{=html}
+- Branch build:
+```
+provider::org::repo::BR::<branch>
+```
 
-Each new commit updates the existing case instead of creating
-duplicates.
+Each new commit updates the same case.
 
-------------------------------------------------------------------------
+---
 
-# 🛡 PR Gating Logic
+## 📊 Case Listing Endpoints
 
-The system supports two pipeline modes:
+### List Cases
 
-CI Mode: - Reports vulnerabilities - Does NOT fail pipeline
+GET `/api/v1/cases`
 
-PR_GATE Mode: - Reports vulnerabilities - Fails pipeline if severity
-threshold exceeded
+Optional filters:
 
-Typical policy: - Block PR if HIGH or CRITICAL vulnerabilities are
-found.
+- `repo`
+- `branch`
+- `status`
 
-------------------------------------------------------------------------
+Example:
 
-# 📊 Stored Case Data
+```
+GET /api/v1/cases?repo=autoreport-case-platform&status=OPEN
+```
+
+---
+
+### Get Case by ID
+
+GET `/api/v1/cases/{case_id}`
+
+Returns full case metadata and severity counts.
+
+---
+
+## 🚧 Gate Logic
+
+If:
+
+- Build is for a PR
+- Target branch is `main`
+- HIGH or CRITICAL findings exist
+
+Then:
+
+```
+"gate": true
+```
+
+CI pipeline should fail the job to block merge.
+
+---
+
+## 📂 Data Storage
 
 Each case stores:
 
--   Repository
--   Branch or PR reference
--   Latest commit SHA
--   Pipeline run metadata
--   Docker image digest
--   Normalized vulnerability findings
--   Severity counters
--   Raw Trivy JSON report
--   Audit history
+- Critical & High counts
+- Max severity
+- Latest commit SHA
+- Latest pipeline run URL
+- Latest image digest
+- Full Trivy report (JSONB)
+- Created / Updated timestamps
 
-------------------------------------------------------------------------
+---
 
-# 🔄 Example Workflow
+## 🧠 Future Improvements (Planned)
 
-1.  Developer pushes branch
-2.  Pipeline builds Docker image
-3.  Trivy scans image
-4.  Findings sent to AutoReport Case Platform
-5.  Case updated automatically
-6.  If PR → main and severity threshold exceeded → merge blocked
+- Webhook notifications (Slack / Teams)
+- Case history tracking per commit
+- Severity trend analytics
+- Role-based access control
+- Repository-to-team mapping
+- CI provider auto-detection
+- Multi-tenant support
 
-------------------------------------------------------------------------
+---
 
-# 🔧 Development Mode (Without Docker)
+## 🧪 Example Use Case
 
-You can also run locally:
+Repository A → PR to main  
+Pipeline builds image → Trivy finds 2 HIGH vulns  
+Pipeline sends JSON to SecureCase →
 
-pip install -r requirements.txt\
-uvicorn app.main:app --reload
+Response:
 
-Make sure your DATABASE_URL points to a reachable Postgres instance.
+```
+{
+  "case_status": "OPEN",
+  "critical": 0,
+  "high": 2,
+  "gate": true
+}
+```
 
-------------------------------------------------------------------------
+Pipeline fails → PR blocked until vulnerabilities resolved.
 
-# 📈 Future Enhancements
+---
 
--   Webhook notifications (Slack / Teams)
--   Case ownership & assignment
--   Severity override workflow
--   Historical comparison between builds
--   SBOM storage & correlation
--   Dashboard frontend
--   Authentication via JWT / OAuth
--   Multi-repository configuration management
+## 🛡 DevSecOps Portfolio Goal
 
-------------------------------------------------------------------------
+SecureCase demonstrates:
 
-# 📜 License
+- CI/CD security integration
+- Vulnerability lifecycle tracking
+- Backend architecture for security automation
+- JSONB data modeling
+- Merge gating logic
+- Production-ready API structure
 
-MIT License
+---
 
-------------------------------------------------------------------------
+## 📄 License
 
-# 👤 Author
-
-Developed as a DevSecOps portfolio project to demonstrate automated
-vulnerability management and CI/CD security enforcement.
+This project is provided for portfolio and educational purposes.

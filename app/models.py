@@ -1,14 +1,25 @@
 from datetime import datetime
+from enum import Enum
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Integer, String, func, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 
 from .db import Base
 
 
+class CaseStatus(str, Enum):
+    OPEN = "OPEN"
+    RESOLVED = "RESOLVED"
+
+
 class BuildCase(Base):
     __tablename__ = "build_cases"
+
+    __table_args__ = (
+        Index("ix_case_key", "case_key"),
+        Index("ix_repo_branch", "repo_name", "branch_name"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
