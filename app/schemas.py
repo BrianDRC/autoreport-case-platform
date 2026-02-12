@@ -1,27 +1,15 @@
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Optional, Dict, Any
+
+from pydantic import BaseModel, Field
+
 
 # ==========================
-# Test Ingest (MVP inicial)
+# Ingest v1 (Generic Scan)
 # ==========================
 
-class IngestTestRequest(BaseModel):
-    case_key: str
-    repo: str
-    branch: str
-    commit: str
-
-
-class IngestTestResponse(BaseModel):
-    status: str
-
-# ==========================
-# Trivy Ingest Schemas
-# ==========================
-
-class TrivyMetadata(BaseModel):
-    provider: str
+class ScanMetadata(BaseModel):
+    provider: str  # CI provider, e.g. "github"
     org: str
     repo: str
     branch: str
@@ -31,33 +19,69 @@ class TrivyMetadata(BaseModel):
     run_id: str
     run_url: str
 
+
 class ImageInfo(BaseModel):
     name: str
     tag: str
     digest: str
 
-class TrivyIngestRequest(BaseModel):
-    metadata: TrivyMetadata
-    image: ImageInfo
-    trivy_report: Dict[str, Any]
 
-class TrivyIngestResponse(BaseModel):
+class ScanIngestRequest(BaseModel):
+    scan_provider: str = Field(..., description="Security scanner provider: trivy/xray/wiz/qualys/etc")
+    metadata: ScanMetadata
+    image: ImageInfo
+    scan_report: Dict[str, Any]
+
+
+class ScanIngestResponse(BaseModel):
     case_status: str
     critical: int
     high: int
+    max_severity: str
     gate: bool
+
+
+# ==========================
+# Cases (Read)
+# ==========================
 
 class CaseListResponse(BaseModel):
     id: int
     case_key: str
+    provider: str
+    org_name: str
     repo_name: str
     branch_name: str
+    pr_id: Optional[int]
+    target_branch: Optional[str]
+    scan_provider: str
+
     status: str
+    critical_vulns: int
+    high_vulns: int
+    critical_misconfig: int
+    high_misconfig: int
     critical_count: int
     high_count: int
     max_severity: str
+
     latest_commit_sha: str
+    latest_image_digest: str
+    latest_run_id: str
+    latest_run_url: str
+
     created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CaseReportResponse(BaseModel):
+    id: int
+    case_key: str
+    scan_provider: str
+    scan_report: Dict[str, Any]
 
     class Config:
         from_attributes = True
