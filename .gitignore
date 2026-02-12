@@ -1,0 +1,57 @@
+# Python
+pycache/
+.py[cod]
+$py.class
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs
+*.log
+
+# SQLite (if ever used locally)
+*.sqlite3
+
+# Environment Variables
+.env
+
+#IDE / Editors
+.vscode/
+.idea/
+.swp
+.swo
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Testing & Coverage
+
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Docker
+*.tar
+
+# Local Docker volumes (if mounted)
+
+pg_data/
+securecase_pg_data/
+
+# Alembic (future migrations)
+alembic/versions/*.pyc
+
+# Misc
+.bak
+.tmp
